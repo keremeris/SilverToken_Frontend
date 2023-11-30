@@ -18,7 +18,7 @@ import { getBalance } from "../../api/util";
 import Modal from "../modal";
 import TxStatus from "../txStatus";
 import TradeConfirm from "../tradeConfirm";
-import axios from 'axios'
+//import axios from 'axios'
 
 import {
   getSlvtSlvdPrice,
