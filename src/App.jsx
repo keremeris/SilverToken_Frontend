@@ -2,7 +2,7 @@
 import { createWeb3Modal, defaultWagmiConfig } from "@web3modal/wagmi/react";
 import { WagmiConfig } from "wagmi";
 import { polygon, mainnet } from "wagmi/chains";
-
+import 'react-toastify/dist/ReactToastify.css';   
 import { ExchangeLayout } from "./components/layout/ExchangeLayout";
 
 const projectId = "3e361008433517ac47fb085f31fc15dd";
@@ -21,7 +21,7 @@ const wagmiConfig = defaultWagmiConfig({
   metadata,
 });
 
-createWeb3Modal({ wagmiConfig, projectId, chains, defaultChain: mainnet });
+createWeb3Modal({ wagmiConfig, projectId, chains, defaultChain: polygon });
 
 function App() {
   return (

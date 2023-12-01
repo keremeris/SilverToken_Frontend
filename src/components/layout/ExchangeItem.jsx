@@ -37,7 +37,6 @@ export function ExchangeItem({
     console.log("handleInput", typeof e.target.value);
     // Remove non-numeric characters
     const numericValue = e.target.value.replace(/[^0-9.]/g, "");
-    console.log(`type of inputbox: ${typeof e.target.value} `)
     updateAmountHandler(numericValue);
   };
 

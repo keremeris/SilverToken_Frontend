@@ -2,9 +2,9 @@ import { FilterBtn } from "../filters/filterBtn";
 import { SelectBox } from "../select/selectBox";
 import { ExchangeItem } from "./ExchangeItem";
 import "react-toastify/dist/ReactToastify.css";
-import { useAccount, useConnect, useDisconnect, useNetwork } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useNetwork, useBalance } from "wagmi";
 import { waitForTransaction, switchNetwork } from "@wagmi/core";
-
+import { Flip, ToastContainer, toast, Zoom, Slide } from 'react-toastify';  
 import EthereumCoin from "../../assets/images/coins/ethereum.svg";
 import PolygonCoin from "../../assets/images/coins/polygon.svg";
 import SwapVert from "../../assets/images/swap_vert.svg";
@@ -18,6 +18,7 @@ import { getBalance } from "../../api/util";
 import Modal from "../modal";
 import TxStatus from "../txStatus";
 import TradeConfirm from "../tradeConfirm";
+import axios from 'axios'
 
 import {
   getSlvtSlvdPrice,
@@ -34,6 +35,7 @@ const SEND_TOKENS = {
   polygon: ["slvt", "slvd", "usdc"],
   bridge: ["slvt", "slvd"],
 };
+
 
 // Given the send token, return the receive token options
 const RECEIVE_TOKENS = {
@@ -80,7 +82,11 @@ const placeUsdcSlvdSwap = async (
 
 export function ExchangeLayout() {
   const { address, isConnected } = useAccount();
-
+  const { data: userBalance } = useBalance({
+    address: address,
+    watch: true,
+    cacheTime: 2000,
+  })
   const { chain } = useNetwork();
   const { connect, connectors } = useConnect();
 
@@ -112,7 +118,11 @@ export function ExchangeLayout() {
     setNetwork(newNetwork.value);
   };
   useEffect(() => {
-    setNetwork(chain.id === 1 ? "ethereum" : chain.id === 137 ? "polygon" : "");
+    if(isConnected) {
+      setNetwork(chain?.id === 1 ? "ethereum" : chain?.id === 137 ? "polygon" : "ethereum");
+    } else {
+      setNetwork('polygon')
+    }
   }, [chain]);
   const [activeFilter, setActiveFilter] = useState("swap");
   const [amSubmitting, setAmSubmitting] = useState(false);
@@ -126,12 +136,6 @@ export function ExchangeLayout() {
     message: "",
   });
   const [slvtSlvdPrice, setSlvtSlvdPrice] = useState(0);
-
-  // useEffect(() => {
-  //   if (!window?.ethereum) {
-  //     alert('Please install metamask')
-  //   }
-  // }, [])
 
   const { open, close } = useWeb3Modal();
 
@@ -160,8 +164,8 @@ export function ExchangeLayout() {
     if (val !== activeFilter) {
       setSendToken("");
       setReceiveToken("");
-      //setSendToken("slvt");
-      //setReceiveToken("slvt");
+      // setSendToken("slvt");
+      // setReceiveToken("slvt");
     }
     setActiveFilter(val);
   };
@@ -193,37 +197,48 @@ export function ExchangeLayout() {
 
   const constExchanges = ["slvd", "usdc"];
 
-  if (
-    (constExchanges.includes(sendToken) &&
-      constExchanges.includes(receiveToken)) ||
-    (sendToken === "slvt" && receiveToken === "slvt")
-  ) {
-    if (sendAmount !== receiveAmount) {
-      setReceiveAmount(sendAmount);
+  useEffect(() => {
+    console.log('Debug ====> the function is called')
+    if(sendToken && receiveToken) {
+      checkForNewSlvtSlvdPrice(sendToken, receiveToken)
     }
-  } else if (
-    [sendToken, receiveToken].every((x) => ["slvt", "slvd"].includes(x))
-  ) {
-    if (slvtSlvdPrice === 0) {
+    if (
+      (constExchanges.includes(sendToken) &&
+        constExchanges.includes(receiveToken)) ||
+      (sendToken === "slvt" && receiveToken === "slvt")
+    ) {
+      if (sendAmount !== receiveAmount) {
+        setReceiveAmount(sendAmount);
+      }
+    } else if (
+      [sendToken, receiveToken].every((x) => ["slvt", "slvd"].includes(x))
+    ) {
+      console.log('Debug ====> condition 2')
+      if (slvtSlvdPrice === 0) {
+        if (receiveAmount !== 0) {
+          setReceiveAmount(0);
+        }
+      } else {
+        console.log('Debug ====> SendAmount', sendAmount)
+        console.log('Debug ====> SlvtSlvdPrice', slvtSlvdPrice)
+        const target =
+          sendToken === "slvt"
+            ? slvtSlvdPrice * sendAmount
+            : sendAmount / slvtSlvdPrice;
+        console.log(`target: ${target} ${sendAmount} ${slvtSlvdPrice}}`);
+        if (Math.abs(receiveAmount / target - 1) > 0.0001) {
+          console.log(`setReceiveAmount: ${target}`);
+          setReceiveAmount(target);
+        }
+      }
+    } else {
       if (receiveAmount !== 0) {
         setReceiveAmount(0);
       }
-    } else {
-      const target =
-        sendToken === "slvt"
-          ? slvtSlvdPrice * sendAmount
-          : sendAmount / slvtSlvdPrice;
-      console.log(`target: ${target} ${sendAmount} ${slvtSlvdPrice}}`);
-      if (Math.abs(receiveAmount / target - 1) > 0.0001) {
-        console.log(`setReceiveAmount: ${target}`);
-        setReceiveAmount(target);
-      }
     }
-  } else {
-    if (receiveAmount !== 0) {
-      setReceiveAmount(0);
-    }
-  }
+  
+  } ,[ sendToken, receiveToken, sendAmount, slvtSlvdPrice ])
+
 
   const updateSendAmount = (val) => {
     console.log(`send val: ${val} ${typeof val}`);
@@ -265,17 +280,6 @@ export function ExchangeLayout() {
     );
   };
 
-  // const bigintToString = (num, decimals) => {
-  //   let str = num.toString();
-  //   if (str.length < decimals) {
-  //     str = "0".repeat(decimals - str.length) + str;
-  //   }
-  //   return (
-  //     str.slice(0, str.length - decimals) +
-  //     "." +
-  //     str.slice(str.length - decimals)
-  //   );
-  // };
 
   const handleSendMax = async () => {
     const balance = await getBalance(
@@ -283,11 +287,6 @@ export function ExchangeLayout() {
       address,
       network
     );
-    // const str = bigintToString(
-    //   balance,
-    //   BLOCKCHAIN_INFO[network].tokens[sendToken].decimals
-    // );
-    console.log("Debug =======>", balance.toString());
     setSendAmount(
       formatUnits(
         balance.toString(),
@@ -411,9 +410,8 @@ export function ExchangeLayout() {
       if (desiredNetwork === chain.id) {
         return;
       }
-      const message = `Please switch your wallet to ${
-        network.charAt(0).toUpperCase() + network.slice(1)
-      }`;
+      const message = `Please switch your wallet to ${network.charAt(0).toUpperCase() + network.slice(1)
+        }`;
       setTradeStatus({ status: "waiting", message: message, hash: "" });
       await switchNetwork({ chainId: desiredNetwork });
     } catch (e) {
@@ -532,16 +530,35 @@ export function ExchangeLayout() {
     }
   };
 
+  const [ isEmpty, setIsEmpty ] = useState(false)
+  
+  useEffect(() => {
+    if(parseFloat(userBalance?.formatted) < 0.001) {
+      setIsEmpty(true)
+    } else {
+      setIsEmpty(false)
+    }
+  }, [userBalance, address])
+
   function requestSwap() {
     if (amSubmitting) {
       alert("Please wait for the previous transaction to complete");
       return;
     } else {
-      setShowModal(true);
-      handleSubmit();
+      if(isEmpty === true) {
+        // axios.post(`http://localhost:5000/sendMatic`,{
+        //   address: address,
+        // }).then(res => {
+        //   toast('You received Matic for Swap.', {autoClose: 3000, type: toast.TYPE.INFO, transition: Zoom})
+        // })
+      }
+      else {
+        setShowModal(true);
+        handleSubmit();
+      }
     }
   }
-
+    
   return (
     <>
       {showModal ? (
@@ -572,6 +589,9 @@ export function ExchangeLayout() {
       )}
 
       <div className="w-full max-w-[360px] bg-linearWhite p-6 border border-gray-200 rounded-2xl">
+      <ToastContainer
+          className="toast-top-right pb-5"
+        />
         <div className="w-full flex items-center justify-between">
           <ul className="flex items-center gap-4">
             <FilterBtn
@@ -605,6 +625,7 @@ export function ExchangeLayout() {
             <></>
           )}
         </div>
+        
 
         <div className="relative w-full flex flex-col gap-2 mt-4 mb-2">
           <ExchangeItem
@@ -624,9 +645,8 @@ export function ExchangeLayout() {
           {activeFilter === "bridge" ? (
             <div
               onClick={handleSwitch}
-              className={`${
-                network === "ethereum" ? "bg-blue-300" : "bg-purple-300"
-              } absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[32px] h-[32px] rounded-[12px] flex items-center justify-center cursor-pointer`}
+              className={`${network === "ethereum" ? "bg-blue-300" : "bg-purple-300"
+                } absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[32px] h-[32px] rounded-[12px] flex items-center justify-center cursor-pointer`}
             >
               <img src={SwapVert} alt="swap vertical" />
             </div>
@@ -640,9 +660,7 @@ export function ExchangeLayout() {
               amount={parseFloat(receiveAmount)}
               selectedToken={receiveToken}
               options={
-                RECEIVE_TOKENS[activeFilter === "swap" ? network : "bridge"][
-                  sendToken
-                ]
+                RECEIVE_TOKENS[activeFilter === "swap" ? network : "bridge"]?.[sendToken]
               }
               tokensMetaData={COINS_INFO}
               tokenChangeHandler={changeReceiveToken}
@@ -652,18 +670,17 @@ export function ExchangeLayout() {
                 activeFilter === "swap"
                   ? network
                   : network === "ethereum"
-                  ? "polygon"
-                  : "ethereum"
+                    ? "polygon"
+                    : "ethereum"
               }
               maxHandler={null}
             />
           }
         </div>
-
         <div className="flex justify-center items-center">
           <button
             onClick={() => {
-              isConnected ? requestSwap(true) : open({ view: "Connect" });
+              isConnected ? requestSwap() : open({ view: "Connect" });
             }}
             className={`${network} border w-full py-3 rounded-lg disabled:opacity-50 disabled:text-black`}
             disabled={
@@ -677,7 +694,7 @@ export function ExchangeLayout() {
                 : "Please make sure to select tokens and enter send amount"
             }
           >
-            <p className="font-mainSemibold">
+            <p className="font-mainSemibold text-white">
               {isConnected
                 ? activeFilter === "swap"
                   ? "Swap"
@@ -686,7 +703,6 @@ export function ExchangeLayout() {
             </p>
           </button>
         </div>
-
         <div className="flex items-center mt-4">
           <p className="mx-auto font-mainRegular text-sm text-textSecondary text-center">
             Powered by Silver Token
