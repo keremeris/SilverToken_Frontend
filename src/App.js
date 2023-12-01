@@ -1,38 +1,24 @@
-import { createWeb3Modal, defaultWagmiConfig } from "@web3modal/wagmi/react";
-import { WagmiConfig } from "wagmi";
-import { polygon, mainnet } from "wagmi/chains";
-
-import { ExchangeLayout } from "./components/layout/ExchangeLayout.jsx";
-
-
-const projectId = "3e361008433517ac47fb085f31fc15dd";
-
-const metadata = {
-  name: "Web3Modal",
-  description: "Web3Modal Example",
-  url: "https://web3modal.com",
-  icons: ["https://avatars.githubusercontent.com/u/37784886"],
-};
-
-const chains = [mainnet, polygon];
-const wagmiConfig = defaultWagmiConfig({
-  chains,
-  projectId,
-  metadata,
-});
-
-createWeb3Modal({ wagmiConfig, projectId, chains, defaultChain: polygon });
-
+import logo from './logo.svg';
+import './App.css';
 
 function App() {
   return (
-    <>
-      <WagmiConfig config={wagmiConfig}>
-        <div className="w-full h-screen flex items-center justify-center">
-          <ExchangeLayout />
-        </div>
-      </WagmiConfig>
-    </>
+    <div className="App">
+      <header className="App-header">
+        <img src={logo} className="App-logo" alt="logo" />
+        <p>
+          Edit <code>src/App.js</code> and save to reload.
+        </p>
+        <a
+          className="App-link"
+          href="https://reactjs.org"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Learn React
+        </a>
+      </header>
+    </div>
   );
 }
 
