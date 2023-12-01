@@ -1,6 +1,6 @@
 import { readContract, prepareWriteContract, writeContract } from "@wagmi/core";
-import ERC20_ABI from "../abis/erc20";
-import { BLOCKCHAIN_INFO } from "../constants";
+import ERC20_ABI from "../abis/erc20.json";
+import { BLOCKCHAIN_INFO } from "../constants.js";
 
 export async function allowance(token, account, spender, network) {
   const result = await readContract({
@@ -31,6 +31,9 @@ export async function approve(tokenAddress, spender, network) {
 }
 
 export async function getBalance(tokenAddress, sender, network) {
+  if (!sender || !tokenAddress) {
+    return 0;
+  }
   const temp = await readContract({
     address: tokenAddress,
     abi: ERC20_ABI,

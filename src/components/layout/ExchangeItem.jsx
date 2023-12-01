@@ -34,7 +34,6 @@ export function ExchangeItem({
     if (!doUpdateAmount) {
       return;
     }
-    console.log("handleInput", typeof e.target.value);
     // Remove non-numeric characters
     const numericValue = e.target.value.replace(/[^0-9.]/g, "");
     updateAmountHandler(numericValue);
@@ -55,7 +54,6 @@ export function ExchangeItem({
     : "";
 
   const handleSelectToken = (exchange) => {
-    console.log("handleSelectToken", JSON.stringify(exchange));
     tokenChangeHandler(exchange.value);
   };
 

@@ -1,7 +1,7 @@
-import { readContract, prepareWriteContract, writeContract } from "@wagmi/core";
-import { BLOCKCHAIN_INFO } from "../constants";
+import { prepareWriteContract, writeContract } from "@wagmi/core";
+import { BLOCKCHAIN_INFO } from "../constants.js";
 import ERC20_ABI from "../abis/erc20.json";
-import { stringToBigint } from "./util";
+import { stringToBigint } from "./util.js";
 export const transferToken = async (token, amount, recipient, network) => {
   try {
     console.log(
@@ -44,13 +44,3 @@ export const transferToken = async (token, amount, recipient, network) => {
     };
   }
 };
-
-async function readFromChain(abi, address, functionName, args) {
-  return await readContract({
-    abi,
-    address,
-    functionName,
-    args,
-    chainId: 137,
-  });
-}

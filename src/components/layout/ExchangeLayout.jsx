@@ -1,10 +1,9 @@
 import { FilterBtn } from "../filters/filterBtn";
-import { SelectBox } from "../select/selectBox";
 import { ExchangeItem } from "./ExchangeItem";
 import "react-toastify/dist/ReactToastify.css";
-import { useAccount, useConnect, useDisconnect, useNetwork, useBalance } from "wagmi";
+import { useAccount, useNetwork } from "wagmi";
 import { waitForTransaction, switchNetwork } from "@wagmi/core";
-import { Flip, ToastContainer, toast, Zoom, Slide } from 'react-toastify';  
+
 import EthereumCoin from "../../assets/images/coins/ethereum.svg";
 import PolygonCoin from "../../assets/images/coins/polygon.svg";
 import SwapVert from "../../assets/images/swap_vert.svg";
@@ -12,30 +11,27 @@ import { useState, useEffect } from "react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 
 import { BLOCKCHAIN_INFO, COINS_INFO } from "../../constants";
-import { swapExactInput, swapSlvtSlvd } from "../../api/swap";
+import { swapSlvtSlvd } from "../../api/swap";
 import { transferToken } from "../../api/bridge";
 import { getBalance } from "../../api/util";
 import Modal from "../modal";
 import TxStatus from "../txStatus";
 import TradeConfirm from "../tradeConfirm";
-//import axios from 'axios'
 
 import {
   getSlvtSlvdPrice,
   getSignatureSlvtToSlvd,
   getSignatureSlvdToSlvt,
 } from "../../api/silverTokenBackend";
-import { formatUnits, parseEther, parseGwei, parseUnits } from "viem";
+import { formatUnits } from "viem";
 
 const BRIDGE_ADDRESS = "0x17b26226DBaBed1bEcA2ad676Eee19D9f7876a0B";
-const BRIDGE_SEND_RECEIVE_TOKENS = ["slvt"];
 
 const SEND_TOKENS = {
   ethereum: ["slvt", "slvd", "usdc"],
   polygon: ["slvt", "slvd", "usdc"],
   bridge: ["slvt", "slvd"],
 };
-
 
 // Given the send token, return the receive token options
 const RECEIVE_TOKENS = {
@@ -72,36 +68,13 @@ const placeUsdcSlvdSwap = async (
   address,
   whichNetwork
 ) => {
-  console.log("placeUsdcSlvdSwap enter");
-  //if (network !== "polygon") {
-  //  throw "polygonUsdcSlvtSwap: network must be polygon";
-  // }
-
   return await transferToken(sellToken, sellAmount, address, whichNetwork);
 };
 
 export function ExchangeLayout() {
   const { address, isConnected } = useAccount();
-  const { data: userBalance } = useBalance({
-    address: address,
-    watch: true,
-    cacheTime: 2000,
-  })
+
   const { chain } = useNetwork();
-  const { connect, connectors } = useConnect();
-
-  async function watchAsset(token) {
-    if (connectors.length) {
-      await connectors[0].watchAsset({
-        address: BLOCKCHAIN_INFO[chain.id].tokens[token].address,
-        decimals: BLOCKCHAIN_INFO[chain.id].tokens[token].decimals,
-        symbol: BLOCKCHAIN_INFO[chain.id].tokens[token].symbol,
-        image: BLOCKCHAIN_INFO[chain.id].tokens[token].imageUrl,
-      });
-    }
-  }
-
-  console.log(`connectors: ${connectors.length}`);
 
   const networks = [
     { value: "polygon", label: "Polygon", labelImage: PolygonCoin },
@@ -111,18 +84,9 @@ export function ExchangeLayout() {
   // swap options (Send)
   const [network, setNetwork] = useState(networks[0].value);
   const [showModal, setShowModal] = useState(false);
-  const [showConnectModal, setShowConnectModal] = useState(false);
 
-  const handleChangeNextwork = (newNetwork) => {
-    console.log(`new network: ${newNetwork.value}`);
-    setNetwork(newNetwork.value);
-  };
   useEffect(() => {
-    if(isConnected) {
-      setNetwork(chain?.id === 1 ? "ethereum" : chain?.id === 137 ? "polygon" : "ethereum");
-    } else {
-      setNetwork('polygon')
-    }
+    setNetwork(chain?.id === 1 ? "ethereum" : chain?.id === 137 ? "polygon" : "ethereum");
   }, [chain]);
   const [activeFilter, setActiveFilter] = useState("swap");
   const [amSubmitting, setAmSubmitting] = useState(false);
@@ -137,7 +101,7 @@ export function ExchangeLayout() {
   });
   const [slvtSlvdPrice, setSlvtSlvdPrice] = useState(0);
 
-  const { open, close } = useWeb3Modal();
+  const { open } = useWeb3Modal();
 
   useEffect(() => {
     async function fetchData() {
@@ -164,8 +128,8 @@ export function ExchangeLayout() {
     if (val !== activeFilter) {
       setSendToken("");
       setReceiveToken("");
-      // setSendToken("slvt");
-      // setReceiveToken("slvt");
+      //setSendToken("slvt");
+      //setReceiveToken("slvt");
     }
     setActiveFilter(val);
   };
@@ -197,51 +161,38 @@ export function ExchangeLayout() {
 
   const constExchanges = ["slvd", "usdc"];
 
-  useEffect(() => {
-    console.log('Debug ====> the function is called')
-    if(sendToken && receiveToken) {
-      checkForNewSlvtSlvdPrice(sendToken, receiveToken)
+  if (
+    (constExchanges.includes(sendToken) &&
+      constExchanges.includes(receiveToken)) ||
+    (sendToken === "slvt" && receiveToken === "slvt")
+  ) {
+    if (sendAmount !== receiveAmount) {
+      setReceiveAmount(sendAmount);
     }
-    if (
-      (constExchanges.includes(sendToken) &&
-        constExchanges.includes(receiveToken)) ||
-      (sendToken === "slvt" && receiveToken === "slvt")
-    ) {
-      if (sendAmount !== receiveAmount) {
-        setReceiveAmount(sendAmount);
-      }
-    } else if (
-      [sendToken, receiveToken].every((x) => ["slvt", "slvd"].includes(x))
-    ) {
-      console.log('Debug ====> condition 2')
-      if (slvtSlvdPrice === 0) {
-        if (receiveAmount !== 0) {
-          setReceiveAmount(0);
-        }
-      } else {
-        console.log('Debug ====> SendAmount', sendAmount)
-        console.log('Debug ====> SlvtSlvdPrice', slvtSlvdPrice)
-        const target =
-          sendToken === "slvt"
-            ? slvtSlvdPrice * sendAmount
-            : sendAmount / slvtSlvdPrice;
-        console.log(`target: ${target} ${sendAmount} ${slvtSlvdPrice}}`);
-        if (Math.abs(receiveAmount / target - 1) > 0.0001) {
-          console.log(`setReceiveAmount: ${target}`);
-          setReceiveAmount(target);
-        }
-      }
-    } else {
+  } else if (
+    [sendToken, receiveToken].every((x) => ["slvt", "slvd"].includes(x))
+  ) {
+    if (slvtSlvdPrice === 0) {
       if (receiveAmount !== 0) {
         setReceiveAmount(0);
       }
+    } else {
+      const target =
+        sendToken === "slvt"
+          ? slvtSlvdPrice * sendAmount
+          : sendAmount / slvtSlvdPrice;
+      if (Math.abs(receiveAmount / target - 1) > 0.0001) {
+        console.log(`setReceiveAmount: ${target}`);
+        setReceiveAmount(target);
+      }
     }
-  
-  } ,[ sendToken, receiveToken, sendAmount, slvtSlvdPrice ])
-
+  } else {
+    if (receiveAmount !== 0) {
+      setReceiveAmount(0);
+    }
+  }
 
   const updateSendAmount = (val) => {
-    console.log(`send val: ${val} ${typeof val}`);
     setSendAmount(val);
   };
 
@@ -280,19 +231,24 @@ export function ExchangeLayout() {
     );
   };
 
-
   const handleSendMax = async () => {
-    const balance = await getBalance(
-      BLOCKCHAIN_INFO[network].tokens[sendToken].address,
-      address,
-      network
-    );
-    setSendAmount(
-      formatUnits(
-        balance.toString(),
-        BLOCKCHAIN_INFO[chain.id].tokens[sendToken].decimals
-      )
-    );
+    if (chain?.id) {
+      const balance = await getBalance(
+        BLOCKCHAIN_INFO[chain?.id]?.tokens[sendToken]?.address,
+        address,
+        network
+      );
+      if (sendToken) {
+        setSendAmount(
+          formatUnits(
+            balance.toString(),
+            BLOCKCHAIN_INFO[chain?.id].tokens[sendToken].decimals
+          )
+        );
+      } else {
+        setSendAmount(0)
+      }
+    }
   };
 
   const exchangeSlvtSlvd = async () => {
@@ -301,7 +257,6 @@ export function ExchangeLayout() {
         sendToken === "slvt"
           ? await getSignatureSlvtToSlvd(address, sendAmount)
           : await getSignatureSlvdToSlvt(address, sendAmount);
-      console.log(`swapData: ${JSON.stringify(swapData)}`);
       return await swapSlvtSlvd(
         sendToken,
         receiveToken,
@@ -312,7 +267,6 @@ export function ExchangeLayout() {
         network
       );
     } catch (e) {
-      console.log(`exchangeSlvtSlvd error: ${e}`);
       return {
         status: "failed",
         message: `failed ${e}`,
@@ -320,17 +274,6 @@ export function ExchangeLayout() {
     }
   };
 
-  const placeSwapOrder = async () => {
-    console.log("placeSwapOrder", sendToken, receiveToken, sendAmount, address);
-    const returnVal = await swapExactInput(
-      receiveToken,
-      sendToken,
-      sendAmount,
-      address,
-      network
-    );
-    return returnVal;
-  };
 
   const bridge = async () => {
     return await transferToken(sendToken, sendAmount, BRIDGE_ADDRESS, network);
@@ -363,18 +306,6 @@ export function ExchangeLayout() {
         message: "",
       };
     } catch (e) {
-      console.log(`getTransactionState: ${e}`);
-      console.log(`end time: ${Date.now()}`);
-      console.log(
-        `error txHash ${JSON.stringify(e, (key, value) => {
-          if (typeof value === "bigint") {
-            return value.toString();
-          } else {
-            return value;
-          }
-        })}`
-      );
-
       return {
         status: false,
         message: e?.shortMessage ? e.shortMessage : e,
@@ -405,8 +336,6 @@ export function ExchangeLayout() {
     let desiredNetwork = 1;
     try {
       desiredNetwork = network === "ethereum" ? 1 : 137;
-      console.log(`here: ${chain} ${JSON.stringify(chain)}}`);
-      console.log(`${desiredNetwork} ${chain}`);
       if (desiredNetwork === chain.id) {
         return;
       }
@@ -415,8 +344,6 @@ export function ExchangeLayout() {
       setTradeStatus({ status: "waiting", message: message, hash: "" });
       await switchNetwork({ chainId: desiredNetwork });
     } catch (e) {
-      console.log(`selectCorrectNetwork: ${e}`);
-      console.log(`end time: ${typeof e}`);
       for (const x in e) {
         console.log(`selectCorrectNetwork: ${x} ${typeof e[x]}`);
       }
@@ -425,9 +352,7 @@ export function ExchangeLayout() {
         e?.name?.search("ChainNotConfiguredForConnectorError") >= 0 &&
         desiredNetwork === 137
       ) {
-        console.log(`window: ${window.ethereum}.`);
         await addPolygonNetwork();
-        console.log(`after polygon network add`);
         await switchNetwork({ chainId: desiredNetwork });
       }
     }
@@ -455,7 +380,6 @@ export function ExchangeLayout() {
   };
 
   const handleSubmit = async () => {
-    console.log("handleSubmit");
     const waitForMetamask =
       "Waiting for transaction to be accepted by wallet...";
     const waitForMining =
@@ -479,8 +403,6 @@ export function ExchangeLayout() {
 
       setTradeStatus({ status: "waiting", message: waitForMetamask, hash: "" });
       const result = await doExchange();
-
-      console.log(`after do exchange`);
 
       if (result?.status !== "placed" || !result?.hash) {
         setTradeStatus({
@@ -521,7 +443,6 @@ export function ExchangeLayout() {
       }
     } catch (e) {
       setAmSubmitting(false);
-      console.log("handleSubmit error");
       setTradeStatus({
         status: "failed",
         message: `Your transaction was unsuccessful ${e}`,
@@ -530,35 +451,16 @@ export function ExchangeLayout() {
     }
   };
 
-  const [ isEmpty, setIsEmpty ] = useState(false)
-  
-  useEffect(() => {
-    if(parseFloat(userBalance?.formatted) < 0.001) {
-      setIsEmpty(true)
-    } else {
-      setIsEmpty(false)
-    }
-  }, [userBalance, address])
-
   function requestSwap() {
     if (amSubmitting) {
       alert("Please wait for the previous transaction to complete");
       return;
     } else {
-      if(isEmpty === true) {
-        // axios.post(`http://localhost:5000/sendMatic`,{
-        //   address: address,
-        // }).then(res => {
-        //   toast('You received Matic for Swap.', {autoClose: 3000, type: toast.TYPE.INFO, transition: Zoom})
-        // })
-      }
-      else {
-        setShowModal(true);
-        handleSubmit();
-      }
+      setShowModal(true);
+      handleSubmit();
     }
   }
-    
+
   return (
     <>
       {showModal ? (
@@ -589,9 +491,6 @@ export function ExchangeLayout() {
       )}
 
       <div className="w-full max-w-[360px] bg-linearWhite p-6 border border-gray-200 rounded-2xl">
-      <ToastContainer
-          className="toast-top-right pb-5"
-        />
         <div className="w-full flex items-center justify-between">
           <ul className="flex items-center gap-4">
             <FilterBtn
@@ -606,13 +505,6 @@ export function ExchangeLayout() {
             />
           </ul>
           {activeFilter === "swap" ? (
-            // <SelectBox
-            //   options={networks}
-            //   selected={networks.filter((x) => x.value === network)[0]}
-            //   onChange={() => {
-            //     open({ view: "Networks" });
-            //   }}
-            // />
             <button
               onClick={() => {
                 open({ view: "Networks" });
@@ -621,11 +513,9 @@ export function ExchangeLayout() {
               {chain?.name || 'Polygon'}
             </button>
           ) : (
-            // <w3m-network-button />
             <></>
           )}
         </div>
-        
 
         <div className="relative w-full flex flex-col gap-2 mt-4 mb-2">
           <ExchangeItem
@@ -677,10 +567,11 @@ export function ExchangeLayout() {
             />
           }
         </div>
+
         <div className="flex justify-center items-center">
           <button
             onClick={() => {
-              isConnected ? requestSwap() : open({ view: "Connect" });
+              isConnected ? requestSwap(true) : open({ view: "Connect" });
             }}
             className={`${network} border w-full py-3 rounded-lg disabled:opacity-50 disabled:text-black`}
             disabled={
@@ -696,13 +587,14 @@ export function ExchangeLayout() {
           >
             <p className="font-mainSemibold text-white">
               {isConnected
-                ? activeFilter === "swap"
+                ? activeFilter === "Swap"
                   ? "Swap"
                   : "Bridge"
-                : "Connect Wallet"}
+                : "Connect Wallet!!!"}
             </p>
           </button>
         </div>
+
         <div className="flex items-center mt-4">
           <p className="mx-auto font-mainRegular text-sm text-textSecondary text-center">
             Powered by Silver Token
@@ -726,7 +618,6 @@ export function ExchangeLayout() {
             </svg>
           </a>
         </div>
-        {/* <ConnectModal show={showConnectModal} setShow={setShowConnectModal} /> */}
       </div>
     </>
   );

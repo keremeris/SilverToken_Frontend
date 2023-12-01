@@ -1,22 +1,10 @@
-import { readContract, prepareWriteContract, writeContract } from "@wagmi/core";
-import { BLOCKCHAIN_INFO } from "../constants";
+import { prepareWriteContract, writeContract } from "@wagmi/core";
+import { BLOCKCHAIN_INFO } from "../constants.js";
 import SWAP_ROUTER_ABI from "../abis/swapRouter.json";
-import { allowance, approve } from "./util";
+import { allowance } from "./util.js";
 import SLVT_ABI from "../abis/slvtToken.json";
 import SLVD_ABI from "../abis/slvdToken.json";
 
-/*
-//struct ExactInputSingleParams {
-//        address tokenIn;
-//        address tokenOut;
-//        uint24 fee;
-//        address recipient;
-//        uint256 deadline;
-//        uint256 amountIn;
-//        uint256 amountOutMinimum;
-//        uint160 sqrtPriceLimitX96;
-    }
- */
 
 export const swapExactInput = async (
   buyToken,
@@ -27,7 +15,6 @@ export const swapExactInput = async (
 ) => {
   //return {'hash': "0xd4840aedc783b57ec5cce39ac4b9e81fd6f9bacded4444bb91d922db9b115b35", 'result': 'success'}
 
-  const decimals = BLOCKCHAIN_INFO[network].tokens[sellToken].decimals;
   const sellTokenAddress =
     BLOCKCHAIN_INFO[network]["tokens"][sellToken]["address"];
   const buyTokenAddress =
@@ -38,7 +25,6 @@ export const swapExactInput = async (
       ? BLOCKCHAIN_INFO.ethereum.swapRouter
       : BLOCKCHAIN_INFO.polygon.swapRouter;
 
-  const amountIn = BigInt(Math.floor(amount * 10 ** decimals));
   console.log(
     `allowance: ${await allowance(
       sellTokenAddress,
@@ -47,13 +33,7 @@ export const swapExactInput = async (
       network
     )}`
   );
-  if (
-    amountIn >
-    (await allowance(sellTokenAddress, recipient, cntAddress, network))
-  ) {
-    const result = await approve(sellTokenAddress, cntAddress, network);
-    console.log(`approve result: ${result}`);
-  }
+
 
   const AMOUNT_OUT_MIN = 0;
   console.log(
@@ -65,7 +45,6 @@ export const swapExactInput = async (
           10000,
           recipient,
           deadline,
-          amountIn,
           AMOUNT_OUT_MIN,
           0,
         ],
@@ -85,7 +64,6 @@ export const swapExactInput = async (
     10000,
     recipient,
     deadline,
-    amountIn,
     AMOUNT_OUT_MIN,
     0,
   ];
@@ -110,7 +88,6 @@ export const swapExactInput = async (
           10000,
           recipient,
           deadline,
-          amountIn,
           AMOUNT_OUT_MIN,
           0,
         ],
@@ -165,22 +142,16 @@ export const swapSlvtSlvd = async (
   signature,
   network
 ) => {
-  const decimals = BLOCKCHAIN_INFO[network].tokens[sellToken].decimals;
-  const buyDecimals = BLOCKCHAIN_INFO[network].tokens[buyToken].decimals;
   const cntAddress = BLOCKCHAIN_INFO[network]["tokens"][sellToken].address;
 
-  const amountIn = BigInt(amountSold);
 
-  const amountOut = BigInt(amountBought);
 
   const functionName = buyToken === "slvd" ? "convertToSLVD" : "convertToSLVT";
-  console.log(`amountin: ${amountIn} ${amountOut} ${timestamp} ${signature}`);
   try {
     const config = await prepareWriteContract({
       address: cntAddress,
       abi: sellToken === "slvt" ? SLVT_ABI : SLVD_ABI,
       functionName,
-      args: [amountIn, amountOut, timestamp, signature],
       chainId: BLOCKCHAIN_INFO[network].chainId,
       value: 0,
     });
@@ -203,13 +174,3 @@ export const swapSlvtSlvd = async (
     return { status: "error", message };
   }
 };
-
-async function readFromChain(abi, address, functionName, args) {
-  return await readContract({
-    abi,
-    address,
-    functionName,
-    args,
-    chainId: 1,
-  });
-}

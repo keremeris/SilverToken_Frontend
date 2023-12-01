@@ -1,8 +1,8 @@
 import ETHCoin from "./assets/images/coins/ethereum.svg";
 import PolygonCoin from "./assets/images/coins/polygon.svg";
 import SLVTCoin from "./assets/images/coins/SLVT.svg";
-import USDCCoin from "./assets/images/coins/USDC.svg";
-import USDC2Coin from "./assets/images/coins/USDC2.svg";
+// import USDCCoin from "./assets/images/coins/USDC.svg";
+import USDCCoin from "./assets/images/coins/USDC2.svg";
 import SLVDCoin from "./assets/images/coins/SLVD.svg";
 import MATICCoin from "./assets/images/coins/MATIC.svg";
 
