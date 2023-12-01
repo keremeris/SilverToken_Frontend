@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components{
+    button.ethereum{
+      @apply bg-blue-300 hover:bg-blue-600 active:bg-blue-900 border-blue-600
+    }
+    button.polygon{
+        @apply bg-purple-300 hover:bg-purple-600 active:bg-purple-900 border-purple-600
+      }
+}
+
